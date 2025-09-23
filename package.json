@@ -1,8 +1,8 @@
 {
-  "name": "my-app",
-  "productName": "my-app",
+  "name": "voicechat-ai",
+  "productName": "VoiceChat AI",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "A modern desktop AI chat application with voice-to-text capabilities and Ollama integration",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",
@@ -11,7 +11,16 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
-  "keywords": [],
+  "keywords": [
+    "electron",
+    "ai",
+    "chat",
+    "voice",
+    "speech-to-text",
+    "ollama",
+    "whisper",
+    "desktop"
+  ],
   "author": {
     "name": "Emanuel Suriano",
     "email": "emanuel.suriano@revolut.com"
