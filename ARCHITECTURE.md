@@ -150,7 +150,7 @@ src/
 // vite.renderer.config.ts
 build: {
   rollupOptions: {
-    external: ['ollama', '@huggingface/transformers']; // Externalize Node.js packages
+    external: ['ollama']; // Externalize Node.js packages
   }
 }
 ```

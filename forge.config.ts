@@ -23,6 +23,8 @@ const config: ForgeConfig = {
         schemes: ['voicechat-ai'],
       },
     ],
+    // Note: Code signing disabled - users need to bypass macOS Gatekeeper
+    // See MACOS_INSTALLATION.md for user instructions
   },
   rebuildConfig: {},
   makers: [

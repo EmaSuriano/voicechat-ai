@@ -282,6 +282,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup code signing (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Create a keychain for code signing
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          # Note: For proper code signing, you need:
+          # 1. Apple Developer Certificate (secrets.MACOS_CERTIFICATE)
+          # 2. Certificate password (secrets.MACOS_CERTIFICATE_PWD)
+          # 3. App Store Connect API key for notarization (optional)
+
+          echo "Code signing setup completed (certificates needed for full signing)"
+
       - name: Create assets directory (if needed)
         run: mkdir -p assets
         shell: bash

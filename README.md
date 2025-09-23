@@ -20,7 +20,28 @@ A modern desktop AI chat application built with Electron, featuring voice-to-tex
 - **🔄 Auto-transcription**: Voice messages are automatically transcribed and sent
 - **📋 Copy-Friendly**: Properly formatted code blocks and content
 
-## 🚀 Getting Started
+## 📥 Download & Install
+
+### For Users (Recommended)
+
+**Download the latest release for your platform:**
+
+[![Download Latest Release](https://img.shields.io/github/v/release/EmaSuriano/voicechat-ai?label=Download&style=for-the-badge)](https://github.com/EmaSuriano/voicechat-ai/releases/latest)
+
+- **macOS**: Download the `.dmg` file
+- **Windows**: Download the `.exe` installer
+- **Linux**: Download the `.deb` or `.rpm` package
+
+> **⚠️ macOS Users**: If you get a "damaged app" error, see our [macOS Installation Guide](MACOS_INSTALLATION.md) for a quick 30-second fix!
+
+### Prerequisites for All Platforms
+
+Before using VoiceChat AI, make sure you have:
+
+- [Ollama](https://ollama.ai/) installed and running
+- At least one Ollama model downloaded (e.g., `ollama pull llama2`)
+
+## 🚀 Getting Started (Developers)
 
 ### Prerequisites
 
