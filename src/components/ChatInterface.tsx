@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Ollama } from 'ollama';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -16,7 +15,6 @@ const ChatInterface: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const ollama = new Ollama();
 
   const {
     isRecording,
@@ -30,6 +28,66 @@ const ChatInterface: React.FC = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Helper function to send messages to Ollama via IPC
+  const sendToOllama = async (messages: Message[]): Promise<void> => {
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: '',
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
+
+    try {
+      let fullContent = '';
+
+      // Set up streaming listener
+      window.electronAPI.onOllamaStreamChunk((chunk: string) => {
+        fullContent += chunk;
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          newMessages[newMessages.length - 1] = {
+            ...assistantMessage,
+            content: fullContent,
+          };
+          return newMessages;
+        });
+      });
+
+      // Send request to main process
+      const result = await window.electronAPI.ollamaChat({
+        model: 'gpt-oss:120b-cloud',
+        messages: messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        stream: true,
+      });
+
+      // Clean up listener
+      window.electronAPI.removeOllamaStreamListener();
+
+      if (!result.success && result.error) {
+        setMessages((prev) => [
+          ...prev.slice(0, -1), // Remove the empty assistant message
+          {
+            role: 'assistant',
+            content: `Sorry, I encountered an error: ${result.error}`,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error communicating with Ollama:', error);
+      window.electronAPI.removeOllamaStreamListener();
+      setMessages((prev) => [
+        ...prev.slice(0, -1), // Remove the empty assistant message
+        {
+          role: 'assistant',
+          content:
+            'Sorry, I encountered an error while processing your message.',
+        },
+      ]);
+    }
   };
 
   useEffect(() => {
@@ -59,42 +117,9 @@ const ChatInterface: React.FC = () => {
           // Send to Ollama
           (async () => {
             try {
-              const response = await ollama.chat({
-                model: 'gpt-oss:120b-cloud',
-                messages: [...messages, userMessage],
-                stream: true,
-              });
-
-              let assistantContent = '';
-              const assistantMessage: Message = {
-                role: 'assistant',
-                content: '',
-              };
-              setMessages((prev) => [...prev, assistantMessage]);
-
-              for await (const part of response) {
-                if (part.message?.content) {
-                  assistantContent += part.message.content;
-                  setMessages((prev) => {
-                    const newMessages = [...prev];
-                    newMessages[newMessages.length - 1] = {
-                      ...assistantMessage,
-                      content: assistantContent,
-                    };
-                    return newMessages;
-                  });
-                }
-              }
+              await sendToOllama([...messages, userMessage]);
             } catch (error) {
               console.error('Error sending message:', error);
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: 'assistant',
-                  content:
-                    'Sorry, I encountered an error while processing your message.',
-                },
-              ]);
             } finally {
               setIsLoading(false);
               // Restore focus to input
@@ -106,7 +131,7 @@ const ChatInterface: React.FC = () => {
         }, 200); // Brief delay to show the transcribed text
       }
     }
-  }, [transcript, clearTranscript, messages, ollama]);
+  }, [transcript, clearTranscript, messages]);
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -117,39 +142,9 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await ollama.chat({
-        model: 'gpt-oss:120b-cloud',
-        messages: [...messages, userMessage],
-        stream: true,
-      });
-
-      let assistantContent = '';
-      const assistantMessage: Message = { role: 'assistant', content: '' };
-      setMessages((prev) => [...prev, assistantMessage]);
-
-      for await (const part of response) {
-        if (part.message?.content) {
-          assistantContent += part.message.content;
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            newMessages[newMessages.length - 1] = {
-              ...assistantMessage,
-              content: assistantContent,
-            };
-            return newMessages;
-          });
-        }
-      }
+      await sendToOllama([...messages, userMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content:
-            'Sorry, I encountered an error while processing your message.',
-        },
-      ]);
     }
 
     setIsLoading(false);

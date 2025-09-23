@@ -7,4 +7,12 @@ export default defineConfig({
     jsxFactory: 'React.createElement',
     jsxFragment: 'React.Fragment',
   },
+  build: {
+    rollupOptions: {
+      external: ['ollama', '@huggingface/transformers'],
+    },
+  },
+  optimizeDeps: {
+    exclude: ['ollama', '@huggingface/transformers'],
+  },
 });

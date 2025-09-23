@@ -220,6 +220,13 @@ See [RELEASE.md](RELEASE.md) for detailed release instructions.
 - Clear node_modules and reinstall: `rm -rf node_modules && npm install`
 - Update Node.js to the latest LTS version
 - Check that all peer dependencies are satisfied
+- If you see Ollama/Node.js import errors, check that Vite externalization is configured correctly
+
+**Architecture Notes**
+
+- Ollama runs in the main process for security and compatibility
+- Speech-to-text runs in the renderer for web API access
+- See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical information
 
 ## 📄 License
 

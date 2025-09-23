@@ -1,6 +1,7 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { Ollama } from 'ollama';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -49,6 +50,51 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+// Initialize Ollama
+const ollama = new Ollama();
+
+// Handle Ollama chat requests from renderer
+ipcMain.handle(
+  'ollama-chat',
+  async (event, { model, messages, stream = true }) => {
+    try {
+      if (stream) {
+        // For streaming responses, we need to handle this differently
+        const response = await ollama.chat({
+          model,
+          messages,
+          stream: true,
+        });
+
+        const chunks: string[] = [];
+        for await (const part of response) {
+          if (part.message?.content) {
+            chunks.push(part.message.content);
+            // Send partial response back to renderer
+            event.sender.send('ollama-stream-chunk', part.message.content);
+          }
+        }
+
+        return { success: true, content: chunks.join('') };
+      } else {
+        const response = await ollama.chat({
+          model,
+          messages,
+          stream: false,
+        });
+
+        return { success: true, content: response.message.content };
+      }
+    } catch (error) {
+      console.error('Ollama chat error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

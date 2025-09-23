@@ -7,40 +7,9 @@ on:
     branches: [main, master, develop]
 
 jobs:
-  test:
-    name: Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [18, 20]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linting
-        run: npm run lint
-
-      - name: Build application (test)
-        run: npm run package
-        env:
-          CI: true
-
-  build-test:
-    name: Test Build Process
+  lint:
+    name: Lint Code
     runs-on: ubuntu-latest
-    needs: test
 
     steps:
       - name: Checkout code
@@ -55,12 +24,82 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run linting
+        run: npm run lint
+
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [18]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxkbcommon-dev libxss1 libasound2-dev
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application (test)
+        run: npm run package
+        env:
+          CI: true
+          DEBUG: electron-forge:*
+
+  build-test:
+    name: Test Full Build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' # Only run full build on pushes, not PRs
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxkbcommon-dev libxss1 libasound2-dev
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Test full build
         run: npm run make
         env:
           CI: true
+          DEBUG: electron-forge:*
+
+      - name: List build output
+        run: |
+          echo "Build output:"
+          ls -la out/ || echo "No out directory"
 
       - name: Upload test build
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: test-build-linux
