@@ -6,6 +6,8 @@ A modern desktop AI chat application built with Electron, featuring voice-to-tex
 ![Electron](https://img.shields.io/badge/Electron-38.1.2-47848F?logo=electron)
 ![React](https://img.shields.io/badge/React-19.1.1-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-4.5.4-3178C6?logo=typescript)
+![CI](https://github.com/emanuelsiuriano/voicechat-ai/workflows/CI/badge.svg)
+![Release](https://github.com/emanuelsiuriano/voicechat-ai/workflows/Electron%20Forge%20Release/badge.svg)
 
 ## ✨ Features
 
@@ -153,6 +155,35 @@ This will create platform-specific distributables in the `out/` directory:
 - **macOS**: `.app` bundle and `.dmg`
 - **Windows**: `.exe` installer
 - **Linux**: `.deb` and `.rpm` packages
+
+## 🤖 Automated Releases
+
+VoiceChat AI includes automated CI/CD workflows:
+
+### 🔄 Continuous Integration
+
+- **Automatic testing** on every push and pull request
+- **Multi-platform builds** (Windows, macOS, Linux)
+- **Code linting** and quality checks
+
+### 🚀 Automated Releases
+
+- **Tag-based releases**: Push a git tag like `v1.0.0` to trigger automatic builds
+- **Cross-platform packages**: Automatically builds for all supported platforms
+- **GitHub Releases**: Packages are automatically uploaded to GitHub Releases
+
+#### Creating a Release
+
+```bash
+# Increment version and create release
+npm run release
+
+# Or manually create a tag
+git tag v1.0.0
+git push --tags
+```
+
+See [RELEASE.md](RELEASE.md) for detailed release instructions.
 
 ## 🤝 Contributing
 

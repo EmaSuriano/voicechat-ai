@@ -3,20 +3,72 @@ import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { PublisherGithub } from '@electron-forge/publisher-github';
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    name: 'VoiceChat AI',
+    executableName: 'voicechat-ai',
+    appBundleId: 'com.emanuelsiuriano.voicechat-ai',
+    appCategoryType: 'public.app-category.productivity',
+    // icon: './assets/icon', // Uncomment when you add icon files
+    protocols: [
+      {
+        name: 'VoiceChat AI',
+        schemes: ['voicechat-ai'],
+      },
+    ],
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      name: 'VoiceChat AI',
+      setupExe: 'VoiceChatAI-Setup.exe',
+      // setupIcon: './assets/icon.ico' // Uncomment when you add icon files
+    }),
+    new MakerDMG({
+      name: 'VoiceChat AI',
+      // icon: './assets/icon.icns', // Uncomment when you add icon files
+      format: 'ULFO',
+    }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        name: 'voicechat-ai',
+        productName: 'VoiceChat AI',
+        genericName: 'AI Chat Application',
+        description:
+          'A modern desktop AI chat application with voice-to-text capabilities',
+        categories: ['Office', 'Network'],
+      },
+    }),
+    new MakerDeb({
+      options: {
+        name: 'voicechat-ai',
+        productName: 'VoiceChat AI',
+        genericName: 'AI Chat Application',
+        description:
+          'A modern desktop AI chat application with voice-to-text capabilities',
+        categories: ['Office', 'Network'],
+        maintainer: 'Emanuel Suriano',
+        homepage: 'https://github.com/emanuelsiuriano/voicechat-ai',
+      },
+    }),
+  ],
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'emanuelsiuriano', // Replace with your GitHub username
+        name: 'voicechat-ai', // Replace with your repo name
+      },
+      prerelease: false,
+      draft: true,
+    }),
   ],
   plugins: [
     new VitePlugin({

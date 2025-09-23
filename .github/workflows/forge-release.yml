@@ -1,0 +1,63 @@
+name: Electron Forge Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: 'darwin'
+          - os: windows-latest
+            platform: 'win32'
+          - os: ubuntu-latest
+            platform: 'linux'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Create assets directory (if needed)
+        run: mkdir -p assets
+        shell: bash
+
+      - name: Build and publish to GitHub
+        run: npm run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicechat-ai-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            out/make/**/*
+            out/VoiceChat*
+          retention-days: 30
