@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Ollama } from 'ollama';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { useSpeechToText } from '../hooks/useSpeechToText';
 
 interface Message {
@@ -47,8 +48,11 @@ const ChatInterface: React.FC = () => {
         // Send the message automatically after a brief delay
         setTimeout(() => {
           // Create a user message with the transcribed text
-          const userMessage: Message = { role: 'user', content: transcribedText };
-          setMessages(prev => [...prev, userMessage]);
+          const userMessage: Message = {
+            role: 'user',
+            content: transcribedText,
+          };
+          setMessages((prev) => [...prev, userMessage]);
           setInput(''); // Clear input after sending
           setIsLoading(true);
 
@@ -62,13 +66,16 @@ const ChatInterface: React.FC = () => {
               });
 
               let assistantContent = '';
-              const assistantMessage: Message = { role: 'assistant', content: '' };
-              setMessages(prev => [...prev, assistantMessage]);
+              const assistantMessage: Message = {
+                role: 'assistant',
+                content: '',
+              };
+              setMessages((prev) => [...prev, assistantMessage]);
 
               for await (const part of response) {
                 if (part.message?.content) {
                   assistantContent += part.message.content;
-                  setMessages(prev => {
+                  setMessages((prev) => {
                     const newMessages = [...prev];
                     newMessages[newMessages.length - 1] = {
                       ...assistantMessage,
@@ -80,11 +87,12 @@ const ChatInterface: React.FC = () => {
               }
             } catch (error) {
               console.error('Error sending message:', error);
-              setMessages(prev => [
+              setMessages((prev) => [
                 ...prev,
                 {
                   role: 'assistant',
-                  content: 'Sorry, I encountered an error while processing your message.',
+                  content:
+                    'Sorry, I encountered an error while processing your message.',
                 },
               ]);
             } finally {
@@ -218,6 +226,7 @@ const ChatInterface: React.FC = () => {
                   <div className="prose prose-sm max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
                       components={{
                         code: ({ children, ...props }: any) => {
                           const isInline =
@@ -275,9 +284,7 @@ const ChatInterface: React.FC = () => {
                           </div>
                         ),
                         thead: ({ children }) => (
-                          <thead className="bg-gray-50">
-                            {children}
-                          </thead>
+                          <thead className="bg-gray-50">{children}</thead>
                         ),
                         tbody: ({ children }) => (
                           <tbody className="divide-y divide-gray-200">
@@ -299,6 +306,7 @@ const ChatInterface: React.FC = () => {
                             {children}
                           </td>
                         ),
+                        br: () => <br className="block" />,
                       }}
                     >
                       {message.content}
@@ -358,8 +366,8 @@ const ChatInterface: React.FC = () => {
                 isTranscribing
                   ? 'Transcribing...'
                   : isRecording
-                  ? 'Stop recording'
-                  : 'Start recording'
+                    ? 'Stop recording'
+                    : 'Start recording'
               }
             >
               {isTranscribing ? (
