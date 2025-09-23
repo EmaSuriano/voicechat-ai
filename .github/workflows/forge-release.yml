@@ -70,9 +70,8 @@ jobs:
       - name: Verify GitHub token permissions
         run: |
           echo "Testing GitHub API access..."
-          curl -H "Authorization: token $GITHUB_TOKEN" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/repos/EmaSuriano/voicechat-ai || echo "API test failed"
+          curl -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/EmaSuriano/voicechat-ai || echo "API test failed"
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
