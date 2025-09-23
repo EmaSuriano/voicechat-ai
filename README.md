@@ -176,6 +176,7 @@ VoiceChat AI includes automated CI/CD workflows:
 #### Creating a Release (Choose One)
 
 **🎯 Automatic (Recommended)**
+
 ```bash
 # Just commit and push - version automatically determined
 git add .
@@ -185,9 +186,10 @@ git push
 ```
 
 **🎛️ Manual Control**
+
 ```bash
 npm run release:patch  # 1.0.0 → 1.0.1
-npm run release:minor  # 1.0.0 → 1.1.0  
+npm run release:minor  # 1.0.0 → 1.1.0
 npm run release:major  # 1.0.0 → 2.0.0
 ```
 

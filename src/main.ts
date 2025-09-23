@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { Ollama } from 'ollama';
+import { streamText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -51,43 +52,44 @@ app.on('activate', () => {
   }
 });
 
-// Initialize Ollama
-const ollama = new Ollama();
+// Initialize AI SDK with Ollama-compatible OpenAI client
+const openai = createOpenAI({
+  baseURL: 'http://localhost:11434/v1', // Ollama's OpenAI-compatible API endpoint
+  apiKey: 'ollama', // Ollama uses 'ollama' as the API key
+});
 
-// Handle Ollama chat requests from renderer
+// Handle AI chat requests from renderer
 ipcMain.handle(
   'ollama-chat',
   async (event, { model, messages, stream = true }) => {
     try {
       if (stream) {
-        // For streaming responses, we need to handle this differently
-        const response = await ollama.chat({
-          model,
-          messages,
-          stream: true,
+        // Use Vercel AI SDK for streaming responses
+        const result = await streamText({
+          model: openai(model),
+          messages: messages,
         });
 
         const chunks: string[] = [];
-        for await (const part of response) {
-          if (part.message?.content) {
-            chunks.push(part.message.content);
-            // Send partial response back to renderer
-            event.sender.send('ollama-stream-chunk', part.message.content);
-          }
+        for await (const textPart of result.textStream) {
+          chunks.push(textPart);
+          // Send partial response back to renderer
+          event.sender.send('ollama-stream-chunk', textPart);
         }
 
         return { success: true, content: chunks.join('') };
       } else {
-        const response = await ollama.chat({
-          model,
-          messages,
-          stream: false,
+        // Use Vercel AI SDK for non-streaming responses
+        const result = await streamText({
+          model: openai(model),
+          messages: messages,
         });
 
-        return { success: true, content: response.message.content };
+        const fullText = await result.text;
+        return { success: true, content: fullText };
       }
     } catch (error) {
-      console.error('Ollama chat error:', error);
+      console.error('AI chat error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

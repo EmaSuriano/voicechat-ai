@@ -4,7 +4,7 @@ import ChatInterface from './components/ChatInterface';
 
 function App() {
   return (
-    <div className="App">
+    <div className="App min-h-screen bg-white dark:bg-gray-900 transition-colors">
       <ChatInterface />
     </div>
   );

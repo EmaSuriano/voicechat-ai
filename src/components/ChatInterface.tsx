@@ -181,13 +181,15 @@ const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto bg-white">
+    <div className="flex flex-col h-screen max-w-4xl mx-auto bg-white dark:bg-gray-900">
       {/* Topbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
-        <h1 className="text-lg font-semibold text-gray-900">VoiceChat AI</h1>
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+          VoiceChat AI
+        </h1>
         <button
           onClick={handleNewChat}
-          className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
         >
           New Chat
         </button>
@@ -195,7 +197,7 @@ const ChatInterface: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+          <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 text-sm">
             Type a message or use voice input to start chatting
           </div>
         ) : (
@@ -209,8 +211,8 @@ const ChatInterface: React.FC = () => {
               <div
                 className={`max-w-[80%] px-4 py-2 rounded-lg ${
                   message.role === 'user'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-50 text-gray-900'
+                    ? 'bg-gray-900 dark:bg-gray-700 text-white'
+                    : 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                 }`}
               >
                 {message.role === 'user' ? (
@@ -223,15 +225,15 @@ const ChatInterface: React.FC = () => {
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeRaw]}
                       components={{
-                        code: ({ children, ...props }: any) => {
+                        code: ({ children, ...props }) => {
                           const isInline =
                             !props.className?.includes('language-');
                           return isInline ? (
-                            <code className="bg-gray-200 px-1 py-0.5 rounded text-xs font-mono">
+                            <code className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-xs font-mono">
                               {children}
                             </code>
                           ) : (
-                            <pre className="bg-gray-100 p-3 rounded overflow-auto text-xs font-mono my-2">
+                            <pre className="bg-gray-100 dark:bg-gray-700 p-3 rounded overflow-auto text-xs font-mono my-2">
                               <code {...props}>{children}</code>
                             </pre>
                           );
@@ -252,7 +254,7 @@ const ChatInterface: React.FC = () => {
                           </ol>
                         ),
                         blockquote: ({ children }) => (
-                          <blockquote className="border-l-2 border-gray-300 pl-4 italic my-2 text-sm">
+                          <blockquote className="border-l-2 border-gray-300 dark:border-gray-600 pl-4 italic my-2 text-sm">
                             {children}
                           </blockquote>
                         ),
@@ -273,31 +275,33 @@ const ChatInterface: React.FC = () => {
                         ),
                         table: ({ children }) => (
                           <div className="overflow-x-auto my-3">
-                            <table className="min-w-full border border-gray-200 text-sm">
+                            <table className="min-w-full border border-gray-200 dark:border-gray-600 text-sm">
                               {children}
                             </table>
                           </div>
                         ),
                         thead: ({ children }) => (
-                          <thead className="bg-gray-50">{children}</thead>
+                          <thead className="bg-gray-50 dark:bg-gray-700">
+                            {children}
+                          </thead>
                         ),
                         tbody: ({ children }) => (
-                          <tbody className="divide-y divide-gray-200">
+                          <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                             {children}
                           </tbody>
                         ),
                         tr: ({ children }) => (
-                          <tr className="border-b border-gray-200">
+                          <tr className="border-b border-gray-200 dark:border-gray-600">
                             {children}
                           </tr>
                         ),
                         th: ({ children }) => (
-                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-900 border-r border-gray-200 last:border-r-0">
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600 last:border-r-0">
                             {children}
                           </th>
                         ),
                         td: ({ children }) => (
-                          <td className="px-3 py-2 text-xs text-gray-700 border-r border-gray-200 last:border-r-0">
+                          <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600 last:border-r-0">
                             {children}
                           </td>
                         ),
@@ -314,12 +318,12 @@ const ChatInterface: React.FC = () => {
         )}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-50 px-4 py-2 rounded-lg">
-              <div className="flex items-center space-x-2 text-gray-500 text-sm">
+            <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-lg">
+              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 text-sm">
                 <div className="flex space-x-1">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0.1s]"></div>
-                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                  <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></div>
+                  <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce [animation-delay:0.1s]"></div>
+                  <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                 </div>
                 <span>Thinking...</span>
               </div>
@@ -329,9 +333,9 @@ const ChatInterface: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t bg-white p-4">
+      <div className="border-t bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 p-4">
         {speechError && (
-          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
             Speech recognition error: {speechError}
           </div>
         )}
@@ -344,7 +348,7 @@ const ChatInterface: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Message VoiceChat AI..."
-              className="w-full resize-none border border-gray-200 rounded-lg px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:opacity-50"
+              className="w-full resize-none border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-400 focus:border-transparent disabled:opacity-50 placeholder-gray-500 dark:placeholder-gray-400"
               rows={1}
               disabled={isLoading}
               autoFocus
@@ -355,7 +359,7 @@ const ChatInterface: React.FC = () => {
               className={`absolute right-2 top-2 p-1.5 rounded-full transition-colors ${
                 isRecording
                   ? 'bg-red-500 text-white animate-pulse'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={
                 isTranscribing
@@ -366,7 +370,7 @@ const ChatInterface: React.FC = () => {
               }
             >
               {isTranscribing ? (
-                <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-gray-600 dark:border-gray-400 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg
                   width="16"
@@ -383,7 +387,7 @@ const ChatInterface: React.FC = () => {
           <button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Send
           </button>
