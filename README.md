@@ -168,22 +168,30 @@ VoiceChat AI includes automated CI/CD workflows:
 
 ### 🚀 Automated Releases
 
-- **Tag-based releases**: Push a git tag like `v1.0.0` to trigger automatic builds
-- **Cross-platform packages**: Automatically builds for all supported platforms
-- **GitHub Releases**: Packages are automatically uploaded to GitHub Releases
+- **🤖 Fully Automated**: Releases created automatically on every commit
+- **📝 Smart Versioning**: Version bumps based on commit message conventions
+- **🏗️ Cross-platform**: Builds for macOS, Windows, and Linux automatically
+- **📦 GitHub Releases**: Installers uploaded automatically
 
-#### Creating a Release
+#### Creating a Release (Choose One)
 
+**🎯 Automatic (Recommended)**
 ```bash
-# Increment version and create release
-npm run release
-
-# Or manually create a tag
-git tag v1.0.0
-git push --tags
+# Just commit and push - version automatically determined
+git add .
+git commit -m "feat: add amazing new feature"
+git push
+# → Automatically creates v1.1.0 release
 ```
 
-See [RELEASE.md](RELEASE.md) for detailed release instructions.
+**🎛️ Manual Control**
+```bash
+npm run release:patch  # 1.0.0 → 1.0.1
+npm run release:minor  # 1.0.0 → 1.1.0  
+npm run release:major  # 1.0.0 → 2.0.0
+```
+
+See [AUTO-RELEASE.md](AUTO-RELEASE.md) for automated release guide and [RELEASE.md](RELEASE.md) for manual release instructions.
 
 ## 🤝 Contributing
 
