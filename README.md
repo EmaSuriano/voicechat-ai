@@ -6,8 +6,8 @@ A modern desktop AI chat application built with Electron, featuring voice-to-tex
 ![Electron](https://img.shields.io/badge/Electron-38.1.2-47848F?logo=electron)
 ![React](https://img.shields.io/badge/React-19.1.1-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-4.5.4-3178C6?logo=typescript)
-![CI](https://github.com/emanuelsiuriano/voicechat-ai/workflows/CI/badge.svg)
-![Release](https://github.com/emanuelsiuriano/voicechat-ai/workflows/Electron%20Forge%20Release/badge.svg)
+[![CI](https://github.com/EmaSuriano/voicechat-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/EmaSuriano/voicechat-ai/actions/workflows/ci.yml)
+[![Release Management](https://github.com/EmaSuriano/voicechat-ai/actions/workflows/release-management.yml/badge.svg)](https://github.com/EmaSuriano/voicechat-ai/actions/workflows/release-management.yml)
 
 ## ✨ Features
 
