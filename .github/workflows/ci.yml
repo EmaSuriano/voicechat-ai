@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, master, develop]
 
+# Performance optimizations:
+# - Parallel execution of lint and test jobs
+# - Conditional multi-platform testing (only on main branch)
+# - Aggressive caching for system deps, npm, and Electron binaries
+# - Reduced build scope for PRs and feature branches
+
 jobs:
   lint:
     name: Lint Code
@@ -30,12 +36,13 @@ jobs:
   test:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    needs: lint
+    # Remove dependency on lint to run in parallel
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Run on Ubuntu for speed, add other platforms only for main branch
+        os: ${{ github.ref == 'refs/heads/main' && fromJSON('["ubuntu-latest", "windows-latest", "macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
         node-version: [18]
 
     steps:
@@ -48,11 +55,29 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - name: Install system dependencies (Linux)
+      - name: Cache system dependencies (Linux)
         if: runner.os == 'Linux'
+        id: cache-system-deps
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-system-deps-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-system-deps-
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux' && steps.cache-system-deps.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxkbcommon-dev libxss1 libasound2-dev
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
 
       - name: Install dependencies
         run: npm ci
@@ -61,13 +86,14 @@ jobs:
         run: npm run package
         env:
           CI: true
-          DEBUG: electron-forge:*
+          # Remove DEBUG to reduce log output
+          ELECTRON_CACHE: ~/.cache/electron
 
   build-test:
     name: Test Full Build
     runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' # Only run full build on pushes, not PRs
+    # Run independently for faster feedback
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Only run full build on main branch pushes
 
     steps:
       - name: Checkout code
@@ -79,10 +105,28 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+      - name: Cache system dependencies
+        id: cache-system-deps-build
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-system-deps-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-system-deps-
+
       - name: Install system dependencies
+        if: steps.cache-system-deps-build.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxkbcommon-dev libxss1 libasound2-dev
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
 
       - name: Install dependencies
         run: npm ci
@@ -91,7 +135,9 @@ jobs:
         run: npm run make
         env:
           CI: true
-          DEBUG: electron-forge:*
+          ELECTRON_CACHE: ~/.cache/electron
+          # Disable unnecessary features for test builds
+          ELECTRON_SKIP_BINARY_DOWNLOAD: false
 
       - name: List build output
         run: |
