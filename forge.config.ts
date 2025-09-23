@@ -27,7 +27,7 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      name: 'VoiceChat AI',
+      name: 'VoiceChatAI', // Package ID must not contain spaces
       setupExe: 'VoiceChatAI-Setup.exe',
       // setupIcon: './assets/icon.ico' // Uncomment when you add icon files
     }),
