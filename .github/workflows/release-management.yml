@@ -1,0 +1,172 @@
+name: Release Management
+
+on:
+  # Automatic release on push to main
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'docs/**'
+      - '*.md'
+      - 'package.json'
+      - 'package-lock.json'
+
+  # Manual release trigger
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      skip_tests:
+        description: 'Skip tests before release'
+        required: false
+        default: false
+        type: boolean
+      force_release:
+        description: 'Force release even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  release:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual Release' || 'Auto Release' }}
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip version]') && !contains(github.event.head_commit.message, '[skip release]')"
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests (Manual Release)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_tests != 'true'
+        run: npm run lint
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Determine version bump type based on trigger
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual release - use provided input
+            BUMP_TYPE="${{ github.event.inputs.version_type }}"
+            echo "type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+            echo "🎯 Manual $BUMP_TYPE version bump requested"
+          else
+            # Automatic release - analyze commit message
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            
+            if [[ $COMMIT_MSG =~ \[major\] ]] || [[ $COMMIT_MSG =~ BREAKING\ CHANGE ]]; then
+              echo "type=major" >> $GITHUB_OUTPUT
+              echo "📈 Major version bump detected from commit message"
+            elif [[ $COMMIT_MSG =~ \[minor\] ]] || [[ $COMMIT_MSG =~ feat: ]] || [[ $COMMIT_MSG =~ feature: ]]; then
+              echo "type=minor" >> $GITHUB_OUTPUT
+              echo "🆕 Minor version bump detected from commit message"
+            else
+              echo "type=patch" >> $GITHUB_OUTPUT
+              echo "🔧 Patch version bump detected from commit message"
+            fi
+          fi
+
+      # Check if release is needed (for automatic releases)
+      - name: Check if release needed
+        id: release_check
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.force_release == 'true'
+        run: |
+          CURRENT_VERSION="v$(node -p "require('./package.json').version")"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+
+          echo "Current version: $CURRENT_VERSION"
+          echo "Latest tag: $LATEST_TAG"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.force_release }}" = "true" ]; then
+            echo "Force release requested"
+            echo "needed=true" >> $GITHUB_OUTPUT
+          elif [ "$CURRENT_VERSION" != "$LATEST_TAG" ]; then
+            echo "Version changed from $LATEST_TAG to $CURRENT_VERSION"
+            echo "needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No version change detected, release not needed"
+            echo "needed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        id: version_bump
+        if: steps.release_check.outputs.needed != 'false'
+        run: |
+          BUMP_TYPE="${{ steps.bump_type.outputs.type }}"
+          echo "Bumping $BUMP_TYPE version..."
+
+          # Bump version and capture the new version
+          NEW_VERSION=$(npm version $BUMP_TYPE --no-git-tag-version)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Commit version bump
+        if: steps.release_check.outputs.needed != 'false'
+        run: |
+          NEW_VERSION="${{ steps.version_bump.outputs.new_version }}"
+          TRIGGER_TYPE="${{ github.event_name == 'workflow_dispatch' && 'manual' || 'auto' }}"
+
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $NEW_VERSION [$TRIGGER_TYPE] [skip ci]"
+          git push
+
+      - name: Create tag and trigger release
+        if: steps.release_check.outputs.needed != 'false'
+        run: |
+          NEW_VERSION="${{ steps.version_bump.outputs.new_version }}"
+          TRIGGER_TYPE="${{ github.event_name == 'workflow_dispatch' && 'Manual' || 'Auto' }}"
+
+          echo "Creating tag: $NEW_VERSION"
+
+          git tag -a "$NEW_VERSION" -m "$TRIGGER_TYPE Release $NEW_VERSION"
+          git push origin "$NEW_VERSION"
+
+          echo "🚀 Tag created: $NEW_VERSION"
+          echo "Release workflows will be triggered automatically."
+
+      - name: Release Summary
+        if: steps.release_check.outputs.needed != 'false'
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version_bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: ${{ steps.bump_type.outputs.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name == 'workflow_dispatch' && 'Manual' || 'Automatic' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag Created**: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Triggered**: ✅" >> $GITHUB_STEP_SUMMARY
+
+      - name: No Release Summary
+        if: steps.release_check.outputs.needed == 'false'
+        run: |
+          echo "## ℹ️ No Release Needed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason**: Version hasn't changed since last release" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version**: v$(node -p "require('./package.json').version")" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest Tag**: $(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tip**: Use 'Force release' option for manual releases" >> $GITHUB_STEP_SUMMARY
