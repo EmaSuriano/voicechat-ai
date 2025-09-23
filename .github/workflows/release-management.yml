@@ -94,49 +94,69 @@ jobs:
             fi
           fi
 
-      # Check if release is needed (for automatic releases)
+      # Check if release is needed
       - name: Check if release needed
         id: release_check
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.force_release == 'true'
         run: |
-          CURRENT_VERSION="v$(node -p "require('./package.json').version")"
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-
-          echo "Current version: $CURRENT_VERSION"
-          echo "Latest tag: $LATEST_TAG"
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.force_release }}" = "true" ]; then
-            echo "Force release requested"
-            echo "needed=true" >> $GITHUB_OUTPUT
-          elif [ "$CURRENT_VERSION" != "$LATEST_TAG" ]; then
-            echo "Version changed from $LATEST_TAG to $CURRENT_VERSION"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual release requested"
             echo "needed=true" >> $GITHUB_OUTPUT
           else
-            echo "No version change detected, release not needed"
-            echo "needed=false" >> $GITHUB_OUTPUT
+            # For automatic releases, check if we already have this version tagged
+            CURRENT_VERSION="v$(node -p "require('./package.json').version")"
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            
+            echo "Current version: $CURRENT_VERSION"
+            echo "Latest tag: $LATEST_TAG"
+            echo "Commit message: $COMMIT_MSG"
+            
+            if [ "$CURRENT_VERSION" != "$LATEST_TAG" ]; then
+              echo "Version already bumped manually, will create tag"
+              echo "needed=true" >> $GITHUB_OUTPUT
+            else
+              echo "Version needs to be bumped, will bump and create tag"
+              echo "needed=true" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Bump version
         id: version_bump
         if: steps.release_check.outputs.needed != 'false'
         run: |
-          BUMP_TYPE="${{ steps.bump_type.outputs.type }}"
-          echo "Bumping $BUMP_TYPE version..."
+          CURRENT_VERSION="v$(node -p "require('./package.json').version")"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 
-          # Bump version and capture the new version
-          NEW_VERSION=$(npm version $BUMP_TYPE --no-git-tag-version)
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New version: $NEW_VERSION"
+          if [ "$CURRENT_VERSION" != "$LATEST_TAG" ]; then
+            echo "Version already bumped to $CURRENT_VERSION"
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            BUMP_TYPE="${{ steps.bump_type.outputs.type }}"
+            echo "Bumping $BUMP_TYPE version..."
+            
+            # Bump version and capture the new version
+            NEW_VERSION=$(npm version $BUMP_TYPE --no-git-tag-version)
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "New version: $NEW_VERSION"
+          fi
 
       - name: Commit version bump
         if: steps.release_check.outputs.needed != 'false'
         run: |
           NEW_VERSION="${{ steps.version_bump.outputs.new_version }}"
+          CURRENT_VERSION="v$(node -p "require('./package.json').version")"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           TRIGGER_TYPE="${{ github.event_name == 'workflow_dispatch' && 'manual' || 'auto' }}"
 
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to $NEW_VERSION [$TRIGGER_TYPE] [skip ci]"
-          git push
+          # Only commit if we actually bumped the version
+          if [ "$CURRENT_VERSION" = "$LATEST_TAG" ]; then
+            echo "Version was bumped, committing changes"
+            git add package.json package-lock.json
+            git commit -m "chore: bump version to $NEW_VERSION [$TRIGGER_TYPE] [skip ci]"
+            git push
+          else
+            echo "Version was already different, skipping commit"
+          fi
 
       - name: Create tag and trigger release
         if: steps.release_check.outputs.needed != 'false'
@@ -166,7 +186,7 @@ jobs:
         if: steps.release_check.outputs.needed == 'false'
         run: |
           echo "## ℹ️ No Release Needed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Reason**: Version hasn't changed since last release" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason**: Workflow logic error or unexpected condition" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.event.head_commit.message }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Current Version**: v$(node -p "require('./package.json').version")" >> $GITHUB_STEP_SUMMARY
-          echo "- **Latest Tag**: $(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tip**: Use 'Force release' option for manual releases" >> $GITHUB_STEP_SUMMARY
+          echo "- **Note**: This should not happen with the current logic" >> $GITHUB_STEP_SUMMARY
