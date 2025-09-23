@@ -3,7 +3,7 @@ name: Build and Release Apps
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -16,9 +16,18 @@ on:
         default: true
         type: boolean
 
+permissions:
+  contents: write
+  actions: read
+  packages: write
+
 jobs:
   release:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+      actions: read
+      packages: write
 
     strategy:
       matrix:
@@ -58,12 +67,23 @@ jobs:
         run: mkdir -p assets
         shell: bash
 
+      - name: Verify GitHub token permissions
+        run: |
+          echo "Testing GitHub API access..."
+          curl -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/EmaSuriano/voicechat-ai || echo "API test failed"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and publish to GitHub
         if: github.event.inputs.create_release != 'false'
         run: npm run publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-forge:publisher*
+          # Additional debugging
+          NODE_DEBUG: electron-forge:publisher*
 
       - name: Build only (no publish)
         if: github.event.inputs.create_release == 'false'

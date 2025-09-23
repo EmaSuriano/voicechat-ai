@@ -172,6 +172,12 @@ jobs:
           echo "🚀 Tag created: $NEW_VERSION"
           echo "Release workflows will be triggered automatically."
 
+          # Verify the tag was created
+          git tag --list "$NEW_VERSION" && echo "✅ Tag verified in local repo"
+
+          # Note: If using GITHUB_TOKEN, other workflows might not trigger
+          # Use PAT_TOKEN secret for cross-workflow triggering
+
       - name: Release Summary
         if: steps.release_check.outputs.needed != 'false'
         run: |
