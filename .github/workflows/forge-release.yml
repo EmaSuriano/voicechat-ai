@@ -11,7 +11,7 @@ on:
         required: true
         default: 'v1.0.0'
       create_release:
-        description: 'Create GitHub release'
+        description: 'Manual release'
         required: false
         default: true
         type: boolean
