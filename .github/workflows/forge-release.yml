@@ -1,4 +1,4 @@
-name: Electron Forge Release
+name: Build and Release Apps
 
 on:
   push:
@@ -10,6 +10,11 @@ on:
         description: 'Version to release (e.g., v1.0.0)'
         required: true
         default: 'v1.0.0'
+      create_release:
+        description: 'Create GitHub release'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   release:
@@ -37,6 +42,12 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxkbcommon-dev libxss1 libasound2-dev
+
       - name: Install dependencies
         run: npm ci
 
@@ -48,9 +59,17 @@ jobs:
         shell: bash
 
       - name: Build and publish to GitHub
+        if: github.event.inputs.create_release != 'false'
         run: npm run publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-forge:publisher*
+
+      - name: Build only (no publish)
+        if: github.event.inputs.create_release == 'false'
+        run: npm run make
+        env:
+          CI: true
 
       - name: Upload artifacts (fallback)
         if: failure()

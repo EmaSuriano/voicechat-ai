@@ -63,11 +63,11 @@ const config: ForgeConfig = {
   publishers: [
     new PublisherGithub({
       repository: {
-        owner: 'emanuelsiuriano', // Replace with your GitHub username
-        name: 'voicechat-ai', // Replace with your repo name
+        owner: 'EmaSuriano',
+        name: 'voicechat-ai',
       },
       prerelease: false,
-      draft: true,
+      draft: false, // Changed to false so releases are published immediately
     }),
   ],
   plugins: [
