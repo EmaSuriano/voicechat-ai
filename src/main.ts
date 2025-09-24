@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { streamText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+
+// Electron Forge constants
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -52,41 +54,82 @@ app.on('activate', () => {
   }
 });
 
-// Initialize AI SDK with Ollama-compatible OpenAI client
-const openai = createOpenAI({
-  baseURL: 'http://localhost:11434/v1', // Ollama's OpenAI-compatible API endpoint
-  apiKey: 'ollama', // Ollama uses 'ollama' as the API key
-});
-
-// Handle AI chat requests from renderer
+// Handle AI chat requests from renderer using direct fetch to Ollama
 ipcMain.handle(
   'ollama-chat',
   async (event, { model, messages, stream = true }) => {
     try {
-      if (stream) {
-        // Use Vercel AI SDK for streaming responses
-        const result = await streamText({
-          model: openai(model),
-          messages: messages,
-        });
+      const response = await fetch(
+        'http://localhost:11434/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ollama',
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            stream,
+          }),
+        },
+      );
 
-        const chunks: string[] = [];
-        for await (const textPart of result.textStream) {
-          chunks.push(textPart);
-          // Send partial response back to renderer
-          event.sender.send('ollama-stream-chunk', textPart);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      if (stream) {
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No reader available for streaming response');
         }
 
-        return { success: true, content: chunks.join('') };
-      } else {
-        // Use Vercel AI SDK for non-streaming responses
-        const result = await streamText({
-          model: openai(model),
-          messages: messages,
-        });
+        const decoder = new TextDecoder();
+        let fullContent = '';
 
-        const fullText = await result.text;
-        return { success: true, content: fullText };
+        try {
+          let isReading = true;
+          while (isReading) {
+            const { done, value } = await reader.read();
+            if (done) {
+              isReading = false;
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter((line) => line.trim());
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                  isReading = false;
+                  break;
+                }
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.choices?.[0]?.delta?.content || '';
+                  if (content) {
+                    fullContent += content;
+                    event.sender.send('ollama-stream-chunk', content);
+                  }
+                } catch (parseError) {
+                  console.error('Error parsing streaming chunk:', parseError);
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+
+        return { success: true, content: fullContent };
+      } else {
+        const result = await response.json();
+        const content = result.choices?.[0]?.message?.content || '';
+        return { success: true, content };
       }
     } catch (error) {
       console.error('AI chat error:', error);

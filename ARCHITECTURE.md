@@ -24,7 +24,7 @@ VoiceChat AI follows Electron's recommended multi-process architecture:
 
 - **Purpose**: Backend operations and system integration
 - **Responsibilities**:
-  - Ollama API communication
+  - Ollama API communication (direct fetch calls)
   - Window management
   - File system access
   - IPC message handling
