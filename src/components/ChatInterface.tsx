@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { useSpeechToText } from '../hooks/useSpeechToText';
+import type { ChatMessage, MCPServersConfig } from '../types/electron';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,8 +14,49 @@ const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [usingTools, setUsingTools] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+
+  // Load MCP servers from the main process (file-based)
+  const [mcpServers, setMcpServers] = useState<MCPServersConfig>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load MCP configuration from main process on component mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        setIsLoadingConfig(true);
+        const result = await window.electronAPI.getMcpConfig();
+        if (result.success && result.config) {
+          setMcpServers(result.config);
+        }
+      } catch (error) {
+        console.error('Failed to load MCP configuration:', error);
+      } finally {
+        setIsLoadingConfig(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
+
+  // Save MCP configuration to main process (file-based)
+  const saveMcpConfig = async (newConfig: MCPServersConfig) => {
+    try {
+      const result = await window.electronAPI.updateMcpConfig(newConfig);
+      if (result.success) {
+        setMcpServers(newConfig);
+        console.log('✅ MCP configuration updated successfully');
+      } else {
+        console.error('❌ Failed to update MCP configuration:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error updating MCP configuration:', error);
+    }
+  };
 
   const {
     isRecording,
@@ -30,61 +72,93 @@ const ChatInterface: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Helper function to send messages to Ollama via IPC
+  // Helper function to process messages via IPC
   const sendToOllama = async (messages: Message[]): Promise<void> => {
+    const lastUserMessage = messages[messages.length - 1]?.content;
+    if (!lastUserMessage?.trim()) {
+      console.warn('No message to send');
+      return;
+    }
+
     const assistantMessage: Message = {
       role: 'assistant',
       content: '',
     };
     setMessages((prev) => [...prev, assistantMessage]);
 
+    // Check if the message might trigger tool usage
+    const toolKeywords = [
+      'weather',
+      'temperature',
+      'climate',
+      'forecast',
+      'rain',
+      'sunny',
+      'cloudy',
+      'snow',
+      'email',
+      'calendar',
+      'schedule',
+    ];
+    const mightUseTools = toolKeywords.some((keyword) =>
+      lastUserMessage.toLowerCase().includes(keyword),
+    );
+
+    if (mightUseTools) {
+      setUsingTools(true);
+    }
+
     try {
-      let fullContent = '';
+      console.log('🤖 Processing request via IPC...');
 
-      // Set up streaming listener
-      window.electronAPI.onOllamaStreamChunk((chunk: string) => {
-        fullContent += chunk;
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1] = {
-            ...assistantMessage,
-            content: fullContent,
-          };
-          return newMessages;
-        });
-      });
+      // Convert all messages to the expected format
+      const chatMessages: ChatMessage[] = messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
 
-      // Send request to main process
+      // Send messages to main process via IPC
       const result = await window.electronAPI.ollamaChat({
-        model: 'gpt-oss:120b-cloud',
-        messages: messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        stream: true,
+        messages: chatMessages,
+        stream: false,
       });
 
-      // Clean up listener
-      window.electronAPI.removeOllamaStreamListener();
+      if (result.success && result.content) {
+        // Simulate streaming for better UX
+        const words = result.content.split(' ');
+        let streamedContent = '';
 
-      if (!result.success && result.error) {
-        setMessages((prev) => [
-          ...prev.slice(0, -1), // Remove the empty assistant message
-          {
-            role: 'assistant',
-            content: `Sorry, I encountered an error: ${result.error}`,
-          },
-        ]);
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i] + (i < words.length - 1 ? ' ' : '');
+          streamedContent += word;
+
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = {
+              ...assistantMessage,
+              content: streamedContent,
+            };
+            return newMessages;
+          });
+
+          // Small delay to simulate streaming
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        }
+      } else {
+        throw new Error(
+          result.error || 'Failed to get response from main process',
+        );
       }
+
+      setUsingTools(false);
     } catch (error) {
-      console.error('Error communicating with Ollama:', error);
-      window.electronAPI.removeOllamaStreamListener();
+      console.error('❌ IPC communication error:', error);
+      setUsingTools(false);
       setMessages((prev) => [
         ...prev.slice(0, -1), // Remove the empty assistant message
         {
           role: 'assistant',
-          content:
-            'Sorry, I encountered an error while processing your message.',
+          content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         },
       ]);
     }
@@ -187,18 +261,38 @@ const ChatInterface: React.FC = () => {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
           VoiceChat AI
         </h1>
-        <button
-          onClick={handleNewChat}
-          className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-        >
-          New Chat
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            title="MCP Server Settings"
+          >
+            Settings
+          </button>
+          <button
+            onClick={handleNewChat}
+            className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            New Chat
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        {/* Show agent status */}
+        {!isLoadingConfig && (
+          <div className="flex items-center justify-center p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <span className="text-xs text-green-800 dark:text-green-200">
+              ✅ AI agent ready with MCP tools
+            </span>
+          </div>
+        )}
+
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 text-sm">
-            Type a message or use voice input to start chatting
+            {isLoadingConfig
+              ? 'Loading configuration...'
+              : 'Type a message or use voice input to start chatting'}
           </div>
         ) : (
           messages.map((message, index) => (
@@ -325,7 +419,14 @@ const ChatInterface: React.FC = () => {
                   <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce [animation-delay:0.1s]"></div>
                   <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                 </div>
-                <span>Thinking...</span>
+                <span>
+                  {usingTools ? 'Using tools to fetch data...' : 'Thinking...'}
+                </span>
+                {usingTools && (
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs">🔧</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -393,6 +494,218 @@ const ChatInterface: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* MCP Server Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                MCP Server Configuration
+              </h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>MCP Servers</strong> provide tools and capabilities to
+                  the AI agent. You can configure different types:
+                </p>
+                <ul className="text-xs text-blue-700 dark:text-blue-300 mt-2 space-y-1">
+                  <li>
+                    <strong>SSE/HTTP:</strong> Web-based servers (e.g., APIs,
+                    web services)
+                  </li>
+                  <li>
+                    <strong>STDIO:</strong> Command-line tools (e.g., npm
+                    packages, scripts)
+                  </li>
+                </ul>
+              </div>
+
+              {Object.entries(mcpServers).map(([serverName, config]) => (
+                <div
+                  key={serverName}
+                  className="border border-gray-200 dark:border-gray-600 rounded-lg p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <input
+                      type="text"
+                      value={serverName}
+                      onChange={(e) => {
+                        if (e.target.value !== serverName) {
+                          const newServers = { ...mcpServers };
+                          delete newServers[serverName];
+                          newServers[e.target.value] = config;
+                          setMcpServers(newServers);
+                        }
+                      }}
+                      className="font-medium text-gray-900 dark:text-white bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 rounded px-2 py-1 text-sm"
+                    />
+                    <button
+                      onClick={() => {
+                        const newServers = { ...mcpServers };
+                        delete newServers[serverName];
+                        setMcpServers(newServers);
+                      }}
+                      className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Transport
+                      </label>
+                      <select
+                        value={config.transport || 'sse'}
+                        onChange={(e) => {
+                          const newServers = { ...mcpServers };
+                          newServers[serverName] = {
+                            ...config,
+                            transport: e.target.value as
+                              | 'sse'
+                              | 'stdio'
+                              | 'http',
+                          };
+                          setMcpServers(newServers);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      >
+                        <option value="sse">SSE</option>
+                        <option value="http">HTTP</option>
+                        <option value="stdio">STDIO</option>
+                      </select>
+                    </div>
+
+                    {config.transport !== 'stdio' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          URL
+                        </label>
+                        <input
+                          type="url"
+                          value={config.url || ''}
+                          onChange={(e) => {
+                            const newServers = { ...mcpServers };
+                            newServers[serverName] = {
+                              ...config,
+                              url: e.target.value,
+                            };
+                            setMcpServers(newServers);
+                          }}
+                          placeholder="https://example.com/mcp"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        />
+                      </div>
+                    )}
+
+                    {config.transport === 'stdio' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Command
+                          </label>
+                          <input
+                            type="text"
+                            value={config.command || ''}
+                            onChange={(e) => {
+                              const newServers = { ...mcpServers };
+                              newServers[serverName] = {
+                                ...config,
+                                command: e.target.value,
+                              };
+                              setMcpServers(newServers);
+                            }}
+                            placeholder="npx"
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Arguments (comma-separated)
+                          </label>
+                          <input
+                            type="text"
+                            value={config.args?.join(', ') || ''}
+                            onChange={(e) => {
+                              const newServers = { ...mcpServers };
+                              newServers[serverName] = {
+                                ...config,
+                                args: e.target.value
+                                  .split(',')
+                                  .map((arg) => arg.trim())
+                                  .filter((arg) => arg),
+                              };
+                              setMcpServers(newServers);
+                            }}
+                            placeholder="--flag, value"
+                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      const newServerName = `server-${Date.now()}`;
+                      setMcpServers({
+                        ...mcpServers,
+                        [newServerName]: {
+                          transport: 'sse',
+                          url: '',
+                        },
+                      });
+                    }}
+                    className="text-blue-500 hover:text-blue-700 text-sm font-medium"
+                  >
+                    + Add New Server
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMcpServers({});
+                    }}
+                    className="text-gray-500 hover:text-gray-700 text-sm"
+                  >
+                    Reset to Defaults
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await saveMcpConfig(mcpServers);
+                  setShowSettings(false);
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

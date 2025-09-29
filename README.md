@@ -1,6 +1,6 @@
 # VoiceChat AI 🎤💬
 
-A modern desktop AI chat application built with Electron, featuring voice-to-text capabilities and seamless integration with Ollama models.
+A modern desktop AI chat application built with Electron, featuring voice-to-text capabilities and seamless integration with Ollama models via the OpenAI SDK.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-38.1.2-47848F?logo=electron)
@@ -12,6 +12,7 @@ A modern desktop AI chat application built with Electron, featuring voice-to-tex
 ## ✨ Features
 
 - **🤖 AI-Powered Chat**: Seamless integration with Ollama for intelligent conversations
+- **🔧 MCP Tools**: Built-in tools for weather information and extensible tool system
 - **🎤 Voice Input**: Built-in speech-to-text using Whisper AI models
 - **📝 Markdown Support**: Rich text rendering with support for code blocks, tables, and HTML tags
 - **⚡ Real-time Streaming**: Live response streaming for instant feedback
@@ -97,7 +98,8 @@ Before using VoiceChat AI, make sure you have:
 
 #### AI & Speech
 
-- **Ollama** - Local AI model integration
+- **OpenAI SDK** - Modern AI client library for seamless integration
+- **Ollama** - Local AI model backend (compatible with OpenAI API)
 - **Hugging Face Transformers** - Speech-to-text processing
 - **Whisper Base English** - Voice recognition model
 
